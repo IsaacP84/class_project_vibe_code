@@ -1,51 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MapView from './MapView';
+import { fetchParadeRoutes, fallbackRoutes } from './services/paradeRoutes';
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('location');
-  const [location, setLocation] = useState('');
+  const [currentView, setCurrentView] = useState('routes');
   const [selectedRoute, setSelectedRoute] = useState(null);
+  const [paradeRoutes, setParadeRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample parade routes with coordinates (New Orleans area)
-  const paradeRoutes = [
-    {
-      id: 1,
-      name: 'Krewe of Bacchus',
-      route: [
-        [29.9511, -90.0715],
-        [29.9611, -90.0815],
-        [29.9711, -90.0915],
-        [29.9811, -90.1015]
-      ]
-    },
-    {
-      id: 2,
-      name: 'Krewe of Endymion',
-      route: [
-        [29.9411, -90.0615],
-        [29.9511, -90.0715],
-        [29.9611, -90.0815],
-        [29.9711, -90.0915]
-      ]
-    },
-    {
-      id: 3,
-      name: 'Krewe of Zulu',
-      route: [
-        [29.9311, -90.0515],
-        [29.9411, -90.0615],
-        [29.9511, -90.0715],
-        [29.9611, -90.0815]
-      ]
-    }
-  ];
+  // Fetch parade routes from ArcGIS API
+  useEffect(() => {
+    const loadRoutes = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const routes = await fetchParadeRoutes();
+        setParadeRoutes(routes);
+      } catch (err) {
+        console.error('Failed to load parade routes:', err);
+        setError(err.message);
+        // Use fallback data
+        setParadeRoutes(fallbackRoutes);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleLocationSubmit = () => {
-    if (location) {
-      setCurrentView('routes');
-    }
-  };
+    loadRoutes();
+  }, []);
 
   const selectRoute = (route) => {
     setSelectedRoute(route);
@@ -58,29 +42,37 @@ function App() {
         <h1>CleanStreet</h1>
         <p>Eliminate garbage pileup after Mardi Gras</p>
       </header>
-      {currentView === 'location' && (
-        <div className="card">
-          <h2>Enter Your Location</h2>
-          <input
-            type="text"
-            placeholder="Enter zip code or allow location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
-          <button onClick={handleLocationSubmit}>Submit</button>
-        </div>
-      )}
       {currentView === 'routes' && (
         <div className="card">
           <h2>Select a Parade Route</h2>
-          <button onClick={() => setCurrentView('location')}>Back</button>
-          <ul>
-            {paradeRoutes.map(route => (
-              <li key={route.id} onClick={() => selectRoute(route)}>
-                {route.name}
-              </li>
-            ))}
-          </ul>
+
+          {loading && <p>Loading parade routes...</p>}
+
+          {error && (
+            <div style={{ color: 'red', margin: '10px 0' }}>
+              <p>Warning: Using sample data - {error}</p>
+            </div>
+          )}
+
+          {!loading && paradeRoutes.length === 0 && (
+            <p>No parade routes found yet. Please refresh or try again later.</p>
+          )}
+
+          {!loading && paradeRoutes.length > 0 && (
+            <ul>
+              {paradeRoutes.map(route => (
+                <li key={route.id} onClick={() => selectRoute(route)}>
+                  <strong>{route.name}</strong>
+                  {route.date && <span style={{ fontSize: '0.8em', color: '#666' }}>
+                    {' '}({route.date})
+                  </span>}
+                  <div style={{ fontSize: '0.8em', color: '#555' }}>
+                    {route.startTime || 'Start unknown'} - {route.endTime || 'End unknown'}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       {currentView === 'map' && selectedRoute && (
