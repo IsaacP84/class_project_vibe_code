@@ -4,6 +4,7 @@ import { mardiGrasRoutesData, convertGeoJSONToRoutes } from '../data/mardiGrasRo
 // Alternative endpoints to try for Mardi Gras routes data
 const ALTERNATIVE_ENDPOINTS = [
   'https://maps.nola.gov/server/rest/services/SpecialEvents/Special_Events/MapServer/3/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson',
+  'https://opendata.arcgis.com/api/v3/datasets/b67df6ad71d14811acb2a185bcb1d819_3/downloads/data?format=geojson&spatialRefId=4326',
   'https://maps.nola.gov/server/rest/services/SpecialEvents/Special_Events/MapServer/3/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json',
   'https://opendata.arcgis.com/datasets/mardi-gras-routes-1.geojson',
   'https://services.arcgis.com/NG6rvFq4c5Hj8BNM/ArcGIS/rest/services/Mardi_Gras_Routes/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson',
