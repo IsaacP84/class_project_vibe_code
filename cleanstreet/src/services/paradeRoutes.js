@@ -3,6 +3,8 @@ import { mardiGrasRoutesData, convertGeoJSONToRoutes } from '../data/mardiGrasRo
 
 // Alternative endpoints to try for Mardi Gras routes data
 const ALTERNATIVE_ENDPOINTS = [
+  'https://maps.nola.gov/server/rest/services/SpecialEvents/Special_Events/MapServer/3/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson',
+  'https://maps.nola.gov/server/rest/services/SpecialEvents/Special_Events/MapServer/3/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json',
   'https://opendata.arcgis.com/datasets/mardi-gras-routes-1.geojson',
   'https://services.arcgis.com/NG6rvFq4c5Hj8BNM/ArcGIS/rest/services/Mardi_Gras_Routes/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson',
   'https://services.arcgis.com/NG6rvFq4c5Hj8BNM/arcgis/rest/services/Mardi_Gras_Routes/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json',
@@ -76,6 +78,73 @@ const extractRouteCoordinates = (geometry) => {
   return [];
 };
 
+const parseYear = (dateValue) => {
+  if (dateValue === null || dateValue === undefined) return null;
+
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return Number.isNaN(d.getTime()) ? null : d.getFullYear();
+  }
+
+  if (typeof dateValue === 'string') {
+    const match = dateValue.match(/\b(20\d{2})\b/);
+    if (match) return Number(match[1]);
+
+    const parsed = Date.parse(dateValue);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).getFullYear();
+    }
+  }
+
+  return null;
+};
+
+const normalizeDate = (dateValue) => {
+  if (dateValue === null || dateValue === undefined) return null;
+
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }
+
+  if (typeof dateValue === 'string') {
+    return dateValue;
+  }
+
+  return null;
+};
+
+export const selectLatestRoutes = (routes, preferredYear = new Date().getFullYear()) => {
+  if (!Array.isArray(routes) || routes.length === 0) return [];
+
+  const routesWithYear = routes.map(route => ({
+    route,
+    year: parseYear(route.date)
+  }));
+
+  const preferred = routesWithYear
+    .filter(item => item.year === preferredYear)
+    .map(item => item.route);
+
+  if (preferred.length > 0) {
+    return preferred;
+  }
+
+  const years = routesWithYear
+    .map(item => item.year)
+    .filter(year => typeof year === 'number');
+
+  if (years.length === 0) {
+    return routes;
+  }
+
+  const latestYear = Math.max(...years);
+  return routesWithYear
+    .filter(item => item.year === latestYear)
+    .map(item => item.route);
+};
+
 export const fetchParadeRoutes = async () => {
   for (const endpoint of ALTERNATIVE_ENDPOINTS) {
     try {
@@ -98,7 +167,7 @@ export const fetchParadeRoutes = async () => {
       // Transform ArcGIS data to our app format
       const routes = transformArcGISData(data);
       if (routes.length > 0) {
-        return routes;
+        return selectLatestRoutes(routes);
       }
 
       console.warn(`No routes found from ${endpoint}, trying next source.`);
@@ -115,7 +184,7 @@ export const fetchParadeRoutes = async () => {
       const localRoutes = convertGeoJSONToRoutes(mardiGrasRoutesData);
       if (localRoutes.length > 0) {
         console.log(`Using ${localRoutes.length} routes from local data`);
-        return localRoutes;
+        return selectLatestRoutes(localRoutes);
       }
     }
   } catch (error) {
@@ -141,6 +210,7 @@ const transformArcGISData = (data) => {
   return features.map((feature, index) => {
     const properties = feature.properties || feature.attributes || {};
     const geometry = feature.geometry || feature.shape || feature;
+    const rawDate = properties.PARADE_DATE || properties.Date || properties.DATE || properties.parade_date;
 
     console.log(`Processing feature ${index}:`, { properties, geometry });
 
@@ -164,13 +234,13 @@ const transformArcGISData = (data) => {
 
     const route = {
       id: properties.OBJECTID || properties.FID || properties.id || index + 1,
-      name: properties.KREWE_NAME || properties.Krewe || properties.Name || properties.krewe_name || `Parade Route ${index + 1}`,
+      name: properties.KREWE_NAME || properties.Krewe || properties.Parade || properties.Name || properties.krewe_name || `Parade Route ${index + 1}`,
       route: routeCoordinates,
-      date: properties.PARADE_DATE || properties.Date || properties.parade_date,
-      startTime: properties.START_TIME || properties.StartTime || properties.start_time,
+      date: normalizeDate(rawDate),
+      startTime: properties.START_TIME || properties.StartTime || properties.start_time || properties.Time,
       endTime: properties.END_TIME || properties.EndTime || properties.end_time,
       krewe: {
-        name: properties.KREWE_NAME || properties.Krewe || properties.krewe_name,
+        name: properties.KREWE_NAME || properties.Krewe || properties.Parade || properties.krewe_name,
         theme: properties.THEME || properties.Theme || properties.theme,
         website: properties.WEBSITE || properties.Website || properties.website
       }

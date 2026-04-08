@@ -3,6 +3,29 @@ import MapView from './MapView';
 import { fetchParadeRoutes, fallbackRoutes } from './services/paradeRoutes';
 import './App.css';
 
+const getDisplayYear = (dateValue) => {
+  if (dateValue === null || dateValue === undefined) return null;
+
+  if (typeof dateValue === 'number') {
+    const d = new Date(dateValue);
+    return Number.isNaN(d.getTime()) ? null : String(d.getFullYear());
+  }
+
+  if (typeof dateValue === 'string') {
+    const match = dateValue.match(/\b(20\d{2})\b/);
+    if (match) return match[1];
+
+    const parsed = Date.parse(dateValue);
+    if (!Number.isNaN(parsed)) {
+      return String(new Date(parsed).getFullYear());
+    }
+
+    return dateValue;
+  }
+
+  return null;
+};
+
 function App() {
   const [currentView, setCurrentView] = useState('routes');
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -63,8 +86,8 @@ function App() {
               {paradeRoutes.map(route => (
                 <li key={route.id} onClick={() => selectRoute(route)}>
                   <strong>{route.name}</strong>
-                  {route.date && <span style={{ fontSize: '0.8em', color: '#666' }}>
-                    {' '}({route.date})
+                  {getDisplayYear(route.date) && <span style={{ fontSize: '0.8em', color: '#666' }}>
+                    {' '}(Year: {getDisplayYear(route.date)})
                   </span>}
                   <div style={{ fontSize: '0.8em', color: '#555' }}>
                     {route.startTime || 'Start unknown'} - {route.endTime || 'End unknown'}

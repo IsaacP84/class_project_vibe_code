@@ -15,10 +15,10 @@ export const mardiGrasRoutesData = [
     "properties": {
       "OBJECTID": 1,
       "KREWE_NAME": "Krewe of Bacchus",
-      "PARADE_DATE": "2024-02-25",
+      "PARADE_DATE": "2026-02-15",
       "START_TIME": "18:00",
       "END_TIME": "22:00",
-      "THEME": "Bacchus Theme 2024",
+      "THEME": "Bacchus Theme 2026",
       "WEBSITE": "https://bacchus.org"
     },
     "geometry": {
@@ -36,10 +36,10 @@ export const mardiGrasRoutesData = [
     "properties": {
       "OBJECTID": 2,
       "KREWE_NAME": "Krewe of Endymion",
-      "PARADE_DATE": "2024-02-26",
+      "PARADE_DATE": "2026-02-16",
       "START_TIME": "16:00",
       "END_TIME": "20:00",
-      "THEME": "Endymion Theme 2024",
+      "THEME": "Endymion Theme 2026",
       "WEBSITE": "https://endymion.org"
     },
     "geometry": {
