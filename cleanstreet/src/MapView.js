@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import html2canvas from 'html2canvas';
 import 'leaflet/dist/leaflet.css';
 
 function MapView({ route }) {
   const [showPredictions, setShowPredictions] = useState(false);
+  const mapRef = useRef(null);
 
   // Early return if route is not provided or invalid
   if (!route || !route.route || !Array.isArray(route.route)) {
@@ -34,8 +36,23 @@ function MapView({ route }) {
     setShowPredictions(true);
   };
 
-  const downloadMap = () => {
-    alert('Download feature not implemented yet.');
+  const downloadMap = async () => {
+    if (!mapRef.current) return;
+
+    try {
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        backgroundColor: '#fff',
+      });
+      const image = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `${(route.name || 'parade_route').replace(/\s+/g, '_').toLowerCase()}_map.png`;
+      link.click();
+    } catch (error) {
+      console.error('Download failed', error);
+      alert('Unable to download the map image right now. Please try again.');
+    }
   };
 
   const routeCenter = route.route && route.route.length > 0
@@ -50,25 +67,28 @@ function MapView({ route }) {
         <p>{route.krewe?.theme ? `Theme: ${route.krewe.theme}` : ''}</p>
         {route.krewe?.website && <p><a href={route.krewe.website} target="_blank" rel="noopener noreferrer">Krewe Website</a></p>}
         <button onClick={generatePredictions}>Generate Predictions</button>
-        {showPredictions && <button onClick={downloadMap}>Download Map</button>}
+        <button onClick={downloadMap}>Download Map</button>
       </div>
-      <MapContainer center={routeCenter} zoom={13} style={{ height: '400px', width: '100%' }}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        <Polyline positions={route.route} color="purple" />
-        {showPredictions && trashHotspots.map((point, index) => (
-          <Marker key={`trash-${index}`} position={[point.lat, point.lng]}>
-            <Popup>Trash Hotspot</Popup>
-          </Marker>
-        ))}
-        {showPredictions && trashCans.map((point, index) => (
-          <Marker key={`can-${index}`} position={[point.lat, point.lng]}>
-            <Popup>Trash Can</Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <div ref={mapRef} className="map-snapshot-wrapper">
+        <MapContainer center={routeCenter} zoom={13} style={{ height: '400px', width: '100%' }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            crossOrigin="anonymous"
+          />
+          <Polyline positions={route.route} color="purple" />
+          {showPredictions && trashHotspots.map((point, index) => (
+            <Marker key={`trash-${index}`} position={[point.lat, point.lng]}>
+              <Popup>Trash Hotspot</Popup>
+            </Marker>
+          ))}
+          {showPredictions && trashCans.map((point, index) => (
+            <Marker key={`can-${index}`} position={[point.lat, point.lng]}>
+              <Popup>Trash Can</Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
     </div>
   );
 }
