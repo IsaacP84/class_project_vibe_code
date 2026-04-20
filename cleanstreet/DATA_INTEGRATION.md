@@ -1,4 +1,4 @@
-# CleanStreet - Mardi Gras Route Data Integration
+# ClearTheStreet - Mardi Gras Route Data Integration
 
 This app integrates with the New Orleans GIS portal to display official Mardi Gras parade routes for post-parade cleanup planning.
 

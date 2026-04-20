@@ -1,7 +1,19 @@
+
 import React, { useState, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import html2canvas from 'html2canvas';
 import 'leaflet/dist/leaflet.css';
+// Custom icon for trash hotspots
+const trashIcon = new L.Icon({
+  iconUrl: process.env.PUBLIC_URL + '/images/trash.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+  shadowUrl: null,
+  shadowSize: null,
+  shadowAnchor: null
+});
 
 const TILE_PROVIDERS = [
   {
@@ -35,18 +47,65 @@ function MapView({ route }) {
     );
   }
 
-  // Sample trash hotspots and trash cans
-  const trashHotspots = [
-    { lat: 29.9561, lng: -90.0765, type: 'trash' },
-    { lat: 29.9661, lng: -90.0865, type: 'trash' },
-    { lat: 29.9761, lng: -90.0965, type: 'trash' }
-  ];
 
-  const trashCans = [
-    { lat: 29.9511, lng: -90.0715, type: 'can' },
-    { lat: 29.9611, lng: -90.0815, type: 'can' },
-    { lat: 29.9711, lng: -90.0915, type: 'can' }
-  ];
+  // Adjustable: number of trash markers to show along the route
+  const NUM_TRASH_MARKERS = 8; // Change this value to adjust marker count
+
+  let trashHotspots = [];
+  if (route.route && route.route.length > 1 && NUM_TRASH_MARKERS > 1) {
+    for (let i = 0; i < NUM_TRASH_MARKERS; i++) {
+      const idx = Math.round(i * (route.route.length - 1) / (NUM_TRASH_MARKERS - 1));
+      const pt = route.route[idx];
+      if (pt && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+        trashHotspots.push({ lat: pt[0], lng: pt[1], type: 'trash' });
+      } else if (pt && pt.lat !== undefined && pt.lng !== undefined) {
+        trashHotspots.push({ lat: pt.lat, lng: pt.lng, type: 'trash' });
+      }
+    }
+  }
+
+  // Place trash cans so that each is within 512 feet of the route
+  // We'll place one trash can at every Nth point along the route, where N is chosen so that spacing is <= 512 ft
+  function haversineDistance(lat1, lng1, lat2, lng2) {
+    // Returns distance in feet
+    const toRad = x => x * Math.PI / 180;
+    const R = 6371000; // meters
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const meters = R * c;
+    return meters * 3.28084; // feet
+  }
+
+  let trashCans = [];
+  const MAX_DIST_FEET = 5280 / 8; 
+  if (route.route && route.route.length > 1) {
+    let prev = null;
+    for (let i = 0; i < route.route.length; i++) {
+      const pt = route.route[i];
+      let lat, lng;
+      if (pt && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+        lat = pt[0]; lng = pt[1];
+      } else if (pt && pt.lat !== undefined && pt.lng !== undefined) {
+        lat = pt.lat; lng = pt.lng;
+      } else {
+        continue;
+      }
+      if (!prev) {
+        trashCans.push({ lat, lng, type: 'can' });
+        prev = { lat, lng };
+      } else {
+        const dist = haversineDistance(prev.lat, prev.lng, lat, lng);
+        if (dist >= MAX_DIST_FEET) {
+          trashCans.push({ lat, lng, type: 'can' });
+          prev = { lat, lng };
+        }
+      }
+    }
+  }
 
   const generatePredictions = () => {
     setShowPredictions(true);
@@ -114,12 +173,12 @@ function MapView({ route }) {
           />
           <Polyline positions={route.route} color="purple" />
           {showPredictions && trashHotspots.map((point, index) => (
-            <Marker key={`trash-${index}`} position={[point.lat, point.lng]}>
+            <Marker key={`trash-${index}`} position={[point.lat, point.lng]} icon={trashIcon}>
               <Popup>Trash Hotspot</Popup>
             </Marker>
           ))}
           {showPredictions && trashCans.map((point, index) => (
-            <Marker key={`can-${index}`} position={[point.lat, point.lng]}>
+            <Marker key={`can-${index}`} position={[point.lat, point.lng]} icon={trashIcon}>
               <Popup>Trash Can</Popup>
             </Marker>
           ))}

@@ -62,7 +62,7 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>CleanStreet</h1>
+        <h1>ClearTheStreet</h1>
         <p>Eliminate garbage pileup after Mardi Gras</p>
       </header>
       {currentView === 'routes' && (
