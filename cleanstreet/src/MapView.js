@@ -1,7 +1,8 @@
 
-import React, { useState, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import React, { useState, useRef, useEffect } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import leafletImage from 'leaflet-image';
 import html2canvas from 'html2canvas';
 import 'leaflet/dist/leaflet.css';
 // Custom icon for trash hotspots
@@ -33,6 +34,7 @@ const TILE_PROVIDERS = [
 function MapView({ route }) {
   const [showPredictions, setShowPredictions] = useState(false);
   const mapRef = useRef(null);
+  const leafletMapRef = useRef(null);
   const [tileProviderIndex, setTileProviderIndex] = useState(0);
 
   // Early return if route is not provided or invalid
@@ -112,13 +114,48 @@ function MapView({ route }) {
   };
 
   const downloadMap = async () => {
-    if (!mapRef.current) return;
+    console.log('downloadMap clicked');
+    if (!leafletMapRef.current) {
+      console.warn('No leaflet map instance available');
+      alert('Map is not ready yet. Please try again in a moment.');
+      return;
+    }
 
+    // Prefer leaflet-image for accurate map exports; fall back to html2canvas if unavailable
     try {
-      const canvas = await html2canvas(mapRef.current, {
-        useCORS: true,
-        backgroundColor: '#fff',
-      });
+      if (typeof leafletImage === 'function') {
+        console.log('Using leaflet-image to export map');
+        leafletImage(leafletMapRef.current, function(err, canvas) {
+          if (err || !canvas) {
+            console.error('Leaflet image export failed', err);
+            // Fallback to html2canvas
+            try {
+              console.log('Falling back to html2canvas');
+              html2canvas(mapRef.current, { useCORS: true, backgroundColor: '#fff' }).then(cv => {
+                const image = cv.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = image;
+                link.download = `${(route.name || 'parade_route').replace(/\s+/g, '_').toLowerCase()}_map.png`;
+                link.click();
+              });
+            } catch (e) {
+              console.error('html2canvas fallback failed', e);
+              alert('Unable to download the map image right now. Please try again.');
+            }
+            return;
+          }
+          const image = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.href = image;
+          link.download = `${(route.name || 'parade_route').replace(/\s+/g, '_').toLowerCase()}_map.png`;
+          link.click();
+        });
+        return;
+      }
+
+      // If leafletImage isn't a function for some reason, use html2canvas as a fallback
+      console.warn('leafletImage not available as function, using html2canvas fallback');
+      const canvas = await html2canvas(mapRef.current, { useCORS: true, backgroundColor: '#fff' });
       const image = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = image;
@@ -129,6 +166,15 @@ function MapView({ route }) {
       alert('Unable to download the map image right now. Please try again.');
     }
   };
+
+  // Ensure we capture the Leaflet map instance when the MapContainer creates it
+  function MapInstanceSetter() {
+    const map = useMap();
+    useEffect(() => {
+      leafletMapRef.current = map;
+    }, [map]);
+    return null;
+  }
 
   const handleTileError = () => {
     setTileProviderIndex((currentIndex) => {
@@ -161,7 +207,14 @@ function MapView({ route }) {
         <button onClick={downloadMap}>Download Map</button>
       </div>
       <div ref={mapRef} className="map-snapshot-wrapper">
-        <MapContainer center={routeCenter} zoom={13} style={{ height: '400px', width: '100%' }}>
+        <MapContainer
+          center={routeCenter}
+          zoom={13}
+          style={{ height: '400px', width: '100%' }}
+          whenCreated={mapInstance => { leafletMapRef.current = mapInstance; }}
+          preferCanvas={true}
+        >
+          <MapInstanceSetter />
           <TileLayer
             key={tileProvider.url}
             url={tileProvider.url}
@@ -171,7 +224,7 @@ function MapView({ route }) {
               tileerror: handleTileError
             }}
           />
-          <Polyline positions={route.route} color="purple" />
+          <Polyline positions={route.route} color="purple" renderer={L.canvas()} />
           {showPredictions && trashHotspots.map((point, index) => (
             <Marker key={`trash-${index}`} position={[point.lat, point.lng]} icon={trashIcon}>
               <Popup>Trash Hotspot</Popup>
